@@ -1,0 +1,107 @@
+import React from 'react';
+import {Platform, StyleSheet, View, KeyboardAvoidingView} from 'react-native';
+import {GiftedChat} from 'react-native-gifted-chat';
+import axios from 'axios';
+import NavigationBar from "react-native-navbar";
+
+const ImagePicker = require("react-native-image-picker");
+
+class Chat extends React.Component
+{
+  state = {
+      messages: [],
+  };
+  constructor(props) {
+    super(props);
+  }
+
+  render(){
+    const rightButtonConfig = {
+      title: 'Share Location',
+      handler: () => {
+        navigator.geolocation.getCurrentPosition(
+          position => {
+            new_message = {};
+            new_message["text"] = "latitute: "+String(position["coords"]["latitude"])+" longitude: "+String(position["coords"]["longitude"]);
+            new_message["user"] = {};
+            new_message["user"]["_id"] = this.props.sender_id;
+            messages = [];
+            messages.push(new_message);
+            data = {
+              messages: messages,
+              receiver: this.props.receiver_id
+            };
+          },
+          error => alert(error.message),
+          { enableHighAccuracy: true, timeout: 20000, maximumAge: 1000 }
+        );
+      },
+    };
+    return(
+      <View style={{ flex: 1 }}>
+        <NavigationBar
+          title={{ title: "chat" }}
+          rightButton={rightButtonConfig}
+        />
+        <GiftedChat
+          messages= {this.state.messages}
+          user= {{ _id: this.props.sender_id}}
+          onSend={(messages) => {
+            data = {
+              messages: messages,
+              receiver: this.props.receiver_id
+            };
+            axios.post('http://172.17.73.227:20000/send_messages', {data})
+            .then(res => {
+              this.setState(previousState => {
+                return {
+                  messages: GiftedChat.append(
+                    previousState.messages,
+                    messages
+                  )
+                }
+              });
+            })
+            .catch(err => console.log(err));
+          }}
+          alwaysShowSend= {true}
+        />
+        {
+          Platform.OS === 'android' && <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={75}/> //keyboardVerticalOffset={75}
+        }
+      </View>
+    );
+  }
+
+  componentDidMount(){
+    data = {
+      sender_id: this.props.sender_id,
+      receiver_id: this.props.receiver_id,
+    };
+    axios.post('http://172.17.73.227:20000/get_messages', {data})
+    .then(res => {
+      this.setState((previousState) => {
+        return {
+          messages: GiftedChat.append(previousState.messages, res.data["messages"]),
+        }
+      });
+    })
+    .catch(err => console.log(err));
+    // this.setState((previousState) => {
+    //     return {
+    //       messages: GiftedChat.append(previousState.messages, this.props.messages),
+    //     };
+    //   });
+    //   this.setState({userid: this.props.userid, username: this.props.username});
+    }
+}
+
+Chat.defaultProps = {
+  sender_id: 0,
+  sender_name: 'Nikhil',
+  receiver_id: 1,
+  receiver_name: 'Nikhil'
+};
+
+
+export default Chat;
